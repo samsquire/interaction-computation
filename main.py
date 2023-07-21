@@ -92,7 +92,7 @@ for event in events:
   print(my_children)
   for item in my_children:
 
-    if item[0].name == event[1]:
+    if item[0].name == event[1] and last_position.doesnt_contain(item[0].name):
       print(item[0].name, "is already in the gap")
 
       child = last_position.add_child(item[0].name, item[0].can_repeat)
@@ -104,7 +104,14 @@ for event in events:
   if not found:
     for item in root.childrenwalk():
 
+      
+      
       if item[0].name == event[1]:
+        if not last_position.doesnt_contain(item[0].name):
+          for child in last_position.children:
+            if child.name == item[0].name:
+              child.taken = True
+              last_position = child
         print(item[0].name, "found in root")
 
         child = last_position.add_child(item[0].name, item[0].can_repeat)
