@@ -1,14 +1,24 @@
 import itertools
 from collections import Counter
 
+class Versions:
+  def __init__(self):
+    self.version = 0
+
+  def next_version(self):
+    current_version = self.version
+    self.version = self.version + 1
+    return current_version
 
 class Tree:
 
-  def __init__(self, name, can_repeat):
+  def __init__(self, name, can_repeat, version, version_generator):
     self.name = name
     self.taken = False
     self.children = []
     self.can_repeat = can_repeat
+    self.version = version
+    self.version_generator = version_generator
 
   def __repr__(self):
     return self.name
@@ -39,8 +49,10 @@ class Tree:
           myvisited.append(item.name)
           yield from item.order(myvisited, True)
 
-  def walk(self, indent=0, visited=[], recurse=False):
+  def walk(self, indent=0, visited=[], identifier=[], recurse=False):
     tag = ""
+    identifier = list(identifier)
+    identifier.append(self.version)
     if self.can_repeat:
       tag = "(recursive)"
 
@@ -48,23 +60,24 @@ class Tree:
 
     if recurse:
       for child in self.children:
-
+        
         myvisited = list(visited)
-        yield (child, "{}{}".format((1 + (indent * 2)) * " ", child))
+        yield (child, "{}{}".format((1 + (indent * 2)) * " ", child), identifier)
         if child.name in visited:
           myvisited.append(child.name)
-          yield from child.walk(indent + 1, myvisited, False)
+          yield from child.walk(indent + 1, myvisited, identifier, recurse=False)
         else:
           myvisited.append(child.name)
-          yield from child.walk(indent + 1, myvisited, True)
+          yield from child.walk(indent + 1, myvisited, identifier, recurse=True)
 
       # visited[self] = True
 
   def add_child(self, name, can_repeat):
-    new_node = Tree(name, can_repeat)
+    
+    new_node = Tree(name, can_repeat, self.version_generator.next_version(), self.version_generator)
     new_children = []
     for child in self.children:
-      new_children.append(Tree(child.name, child.can_repeat))
+      new_children.append(Tree(child.name, child.can_repeat, self.version_generator.next_version(), self.version_generator))
     new_node.children = new_children
     self.children.append(new_node)
 
@@ -74,16 +87,17 @@ class Tree:
 definitions = [("windows", False), ("mac", False), ("linux", False),
                ("enter_scope", True), ("exit_scope", True)]
 
-root = Tree("root", True)
+versions = Versions()
+root = Tree("root", True, versions.next_version(), versions)
 for event in definitions:
   root.add_child(event[0], event[1])
-defs = root.walk(0, {}, True)
+defs = root.walk(0, {}, [], recurse=True)
 for item in defs:
   print(item[1])
 events = [("+", "windows", False), ("+", "mac", False), ("+", "linux", False),
           ("+", "enter_scope", True), ("+", "exit_scope", True),
           ("+", "windows", True)]
-gap = Tree("gap", True)
+gap = Tree("gap", True, versions.next_version(), versions)
 gaproot = gap
 last_position = gap
 for event in events:
@@ -127,10 +141,10 @@ for event in events:
 
 print("### GAP OUTPUT")
 
-defs = gap.walk(0, {}, True)
+defs = gap.walk(0, {}, [], recurse=True)
 for item in defs:
   #if item[0].taken:
-  print(item[1])
+  print(item[1], item[2])
 
 print("### TRAVESAL OF INTERACTION SPACE")
 
@@ -169,3 +183,51 @@ print(
 # merge behaviour
 
 # orderings
+
+A = {"B": "One", "C": "Two",  "D": "Three"}
+C = {"B": "Two", "C": "Three",  "D": "Four"}
+
+def recur(root, lefts, excepts):
+  for key, item in lefts.items():
+    for v in item:
+      if v in excepts:
+        continue
+      child = root.add_child("{}={}".format(key, v), False)
+      excepts = list(excepts)
+      excepts.append(v)
+      recur(child, lefts, excepts)
+  return root
+      
+
+def create_tree(lefts):
+  root = Tree("root", False, versions.next_version(), versions)
+  recur(root, lefts, [])
+  return root
+
+def multiply(left, right):
+  lefts = {}
+  for key, value in left.items():
+    if key not in lefts:
+      lefts[key] = []
+    lefts[key].append(value)
+  
+  for key, value in right.items():
+    if key not in lefts:
+      lefts[key] = []
+    lefts[key].append(value)
+  output = ""
+  for key, value in lefts.items():
+    output += "{} =[{}] ".format(key, ",".join(value))
+  root = create_tree(lefts)
+      
+      
+  
+  return "A×C = {}".format(output), root
+  
+
+r, t = multiply(A, C)
+print(r)
+print(t)
+defs = t.walk(0, {}, [], recurse=True)
+for item in defs:
+  print(item[1])
