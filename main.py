@@ -61,7 +61,7 @@ class Tree:
     if recurse:
       for child in self.children:
         
-        myvisited = list(visited)
+        myvisited = list()
         yield (child, "{}{}".format((1 + (indent * 2)) * " ", child), identifier)
         if child.name in visited:
           myvisited.append(child.name)
@@ -72,13 +72,14 @@ class Tree:
 
       # visited[self] = True
 
-  def add_child(self, name, can_repeat):
+  def add_child(self, name, can_repeat, copy=True):
     
     new_node = Tree(name, can_repeat, self.version_generator.next_version(), self.version_generator)
     new_children = []
-    for child in self.children:
-      new_children.append(Tree(child.name, child.can_repeat, self.version_generator.next_version(), self.version_generator))
-    new_node.children = new_children
+    if copy:
+      for child in self.children:
+        new_children.append(Tree(child.name, child.can_repeat, self.version_generator.next_version(), self.version_generator))
+      new_node.children = new_children
     self.children.append(new_node)
 
     return new_node
@@ -189,13 +190,15 @@ C = {"B": "Two", "C": "Three",  "D": "Four"}
 
 def recur(root, lefts, excepts):
   for key, item in lefts.items():
+    if key in excepts:
+      continue
+    myexcepts = list(excepts)
+    myexcepts.append(key)
+    
     for v in item:
-      if v in excepts:
-        continue
-      child = root.add_child("{}={}".format(key, v), False)
-      excepts = list(excepts)
-      excepts.append(v)
-      recur(child, lefts, excepts)
+      child = root.add_child("{}={}".format(key, v), False, copy=False)
+      recur(child, lefts, myexcepts)
+
   return root
       
 
