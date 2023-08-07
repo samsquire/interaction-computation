@@ -1,14 +1,19 @@
 import itertools
 from collections import Counter
 
+
 class Versions:
+
   def __init__(self):
     self.version = 0
+    self.index = {}
 
-  def next_version(self):
+  def next_version(self, item):
     current_version = self.version
+    self.index[current_version] = item
     self.version = self.version + 1
     return current_version
+
 
 class Tree:
 
@@ -36,20 +41,24 @@ class Tree:
 
     return not found
 
-  def order(self, visited, recurse=False):
+  def order(self, visited, visited_list, recurse=False):
+
     if self.taken:
-      yield self, "{}".format(self.name)
+      vs = list(map(lambda x: x.version, visited_list))
+      yield self, "{}".format(self.name), vs
     if recurse:
       for item in self.children:
         myvisited = list(visited)
+        myvisitedlist = list(visited_list)
+        myvisitedlist.append(item)
         if item.name in visited:
           myvisited.append(item.name)
-          yield from item.order(myvisited, False)
+          yield from item.order(myvisited, myvisitedlist, False)
         else:
           myvisited.append(item.name)
-          yield from item.order(myvisited, True)
+          yield from item.order(myvisited, myvisitedlist, True)
 
-  def walk(self, indent=0, visited=[], identifier=[], recurse=False):
+  def walk(self, indent=0, visited=[], visited_items=[], identifier=[], recurse=False):
     tag = ""
     identifier = list(identifier)
     identifier.append(self.version)
@@ -60,25 +69,39 @@ class Tree:
 
     if recurse:
       for child in self.children:
-        
+
         myvisited = list()
-        yield (child, "{}{}".format((1 + (indent * 2)) * " ", child), identifier)
+        myvisited_items = list()
+        yield (child, "{}{}".format((1 + (indent * 2)) * " ",
+                                    child), identifier)
         if child.name in visited:
+          myvisited_items.append(child.version)
           myvisited.append(child.name)
-          yield from child.walk(indent + 1, myvisited, identifier, recurse=False)
+          yield from child.walk(indent + 1,
+                                myvisited,
+                                identifier,
+                          myvisited_items, recurse=False)
         else:
+          myvisited_items.append(child.version)
           myvisited.append(child.name)
-          yield from child.walk(indent + 1, myvisited, identifier, recurse=True)
+          yield from child.walk(indent + 1,
+                                myvisited,
+                                identifier,
+                                myvisited_items,  recurse=True)
 
       # visited[self] = True
 
   def add_child(self, name, can_repeat, copy=True):
-    
-    new_node = Tree(name, can_repeat, self.version_generator.next_version(), self.version_generator)
+
+    new_node = Tree(name, can_repeat, 0, self.version_generator)
+    new_node.version = self.version_generator.next_version(new_node)
     new_children = []
     if copy:
       for child in self.children:
-        new_children.append(Tree(child.name, child.can_repeat, self.version_generator.next_version(), self.version_generator))
+        new_child = Tree(child.name, child.can_repeat, 0,
+                         self.version_generator)
+        new_children.append(new_child)
+        new_child.version = self.version_generator.next_version(new_child)
       new_node.children = new_children
     self.children.append(new_node)
 
@@ -86,10 +109,12 @@ class Tree:
 
 
 definitions = [("windows", False), ("mac", False), ("linux", False),
-               ("enter_scope", True), ("exit_scope", True)]
+               ("enter_scope", True), ("exit_scope", True),
+               ("create_thread", True)]
 
 versions = Versions()
-root = Tree("root", True, versions.next_version(), versions)
+root = Tree("root", True, 0, versions)
+root.version = versions.next_version(root)
 for event in definitions:
   root.add_child(event[0], event[1])
 defs = root.walk(0, {}, [], recurse=True)
@@ -97,8 +122,9 @@ for item in defs:
   print(item[1])
 events = [("+", "windows", False), ("+", "mac", False), ("+", "linux", False),
           ("+", "enter_scope", True), ("+", "exit_scope", True),
-          ("+", "windows", True)]
-gap = Tree("gap", True, versions.next_version(), versions)
+          ("+", "create_thread", True)]
+gap = Tree("gap", True, 0, versions)
+gap.version = versions.next_version(gap)
 gaproot = gap
 last_position = gap
 for event in events:
@@ -119,8 +145,6 @@ for event in events:
   if not found:
     for item in root.childrenwalk():
 
-      
-      
       if item[0].name == event[1]:
         if not last_position.doesnt_contain(item[0].name):
           for child in last_position.children:
@@ -149,8 +173,8 @@ for item in defs:
 
 print("### TRAVESAL OF INTERACTION SPACE")
 
-for item in gaproot.order([], True):
-  print(item[1])
+for item in gaproot.order([], [], True):
+  print(item[1], item[2])
 
 # interactions between disperate things
 
@@ -185,8 +209,9 @@ print(
 
 # orderings
 
-A = {"B": "One", "C": "Two",  "D": "Three"}
-C = {"B": "Two", "C": "Three",  "D": "Four"}
+A = {"B": "One", "C": "Two", "D": "Three"}
+C = {"B": "Two", "C": "Three", "D": "Four"}
+
 
 def recur(root, lefts, excepts):
   for key, item in lefts.items():
@@ -194,18 +219,20 @@ def recur(root, lefts, excepts):
       continue
     myexcepts = list(excepts)
     myexcepts.append(key)
-    
+
     for v in item:
       child = root.add_child("{}={}".format(key, v), False, copy=False)
       recur(child, lefts, myexcepts)
 
   return root
-      
+
 
 def create_tree(lefts):
-  root = Tree("root", False, versions.next_version(), versions)
+  root = Tree("root", False, 0, versions)
+  root.version = versions.next_version(root)
   recur(root, lefts, [])
   return root
+
 
 def multiply(left, right):
   lefts = {}
@@ -213,7 +240,7 @@ def multiply(left, right):
     if key not in lefts:
       lefts[key] = []
     lefts[key].append(value)
-  
+
   for key, value in right.items():
     if key not in lefts:
       lefts[key] = []
@@ -222,11 +249,9 @@ def multiply(left, right):
   for key, value in lefts.items():
     output += "{} =[{}] ".format(key, ",".join(value))
   root = create_tree(lefts)
-      
-      
-  
+
   return "A×C = {}".format(output), root
-  
+
 
 r, t = multiply(A, C)
 print(r)
@@ -234,3 +259,71 @@ print(t)
 defs = t.walk(0, {}, [], recurse=True)
 for item in defs:
   print(item[1])
+
+from subprocess import Popen, PIPE
+
+
+class Graph():
+
+  def __init__(self, name):
+    self.adjacency = {}
+    self.backwards = {}
+    self.name = name
+    self.nodes = []
+
+  def search(self, node):
+    found = set()
+    if node in self.nodes:
+      for out in self.adjacency[node]:
+        found.add(out)
+      
+      for backward in self.backwards[node]:
+        found.add(backward)
+    return found
+  
+  def add_edge(self, start, end):
+
+    if start not in self.adjacency:
+      self.adjacency[start] = []
+      self.backwards[start] = []
+      self.nodes.append(start)
+    if end not in self.adjacency:
+      self.adjacency[end] = []
+      self.backwards[end] = []
+      self.nodes.append(end)
+    self.adjacency[start].append(end)
+    self.adjacency[end].append(start)
+
+  def draw(self):
+    dot = Popen(["dot", "-Tpng", "-o", "graphs/{}.png".format(self.name)],
+                stdin=PIPE,
+                stdout=PIPE)
+    graph = "digraph G {"
+    for item, value in self.adjacency.items():
+      for link in value:
+        graph += "\"{}\" -> \"{}\";".format(item, link)
+    graph += "}"
+
+    dot.communicate(graph.encode("utf8"))
+
+
+interactions = Graph("root")
+interactions.add_edge("windows", "create_thread")
+
+interactions.draw()
+
+
+def find_abstractions(versions, interactions, gap):
+  found = set([])
+  for item in root.walk(0, {}, [], recurse=True):
+    vs = item[2]
+    strr = item[0].name
+    for version in vs:
+      link = versions.index[version]
+      if link != item[0]:
+        strr = "{}_{}".format(strr, link.name)
+    found.add(strr)
+  return found
+
+items = find_abstractions(versions, interactions, gap)
+print(items)
