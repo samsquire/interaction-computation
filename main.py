@@ -120,7 +120,7 @@ for event in definitions:
 defs = root.walk(0, {}, [], recurse=True)
 for item in defs:
   print(item[1])
-events = [("+", "windows", False), ("+", "mac", False), ("+", "linux", False),
+events = [("+", "windows", False),
           ("+", "enter_scope", True), ("+", "exit_scope", True),
           ("+", "create_thread", True)]
 gap = Tree("gap", True, 0, versions)
@@ -314,16 +314,22 @@ interactions.draw()
 
 
 def find_abstractions(versions, interactions, gap):
-  found = set([])
-  for item in root.walk(0, {}, [], recurse=True):
+  found = []
+  visited = {}
+  for item in gap.order([], [], True):
+    
     vs = item[2]
     strr = item[0].name
+    
+    print(vs)
     for version in vs:
       link = versions.index[version]
-      if link != item[0]:
-        strr = "{}_{}".format(strr, link.name)
-    found.add(strr)
+      if link.name not in visited:
+        strr = link.name
+        visited[strr] = True
+        found.append(strr)
   return found
 
 items = find_abstractions(versions, interactions, gap)
-print(items)
+for item in items:
+  print(item)
